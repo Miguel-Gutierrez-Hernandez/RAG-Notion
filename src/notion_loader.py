@@ -54,7 +54,11 @@ class NotionClient:
 
     def _request(self, method: str, path: str, **kwargs) -> dict:
         for attempt in range(6):
-            r = self.session.request(method, f"{API}{path}", timeout=30, **kwargs)
+            try:
+                r = self.session.request(method, f"{API}{path}", timeout=30, **kwargs)
+            except requests.RequestException as e:
+                raise NotionError(f"No se pudo conectar con Notion: {e.__class__.__name__}. "
+                                  "Revisa tu conexión a internet.")
             if r.status_code == 429:
                 time.sleep(float(r.headers.get("Retry-After", 1)))
                 continue
