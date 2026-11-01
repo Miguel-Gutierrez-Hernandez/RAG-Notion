@@ -1,8 +1,14 @@
 """Divide una página Markdown en fragmentos (chunks) con contexto."""
+import json
 import re
 from dataclasses import dataclass
 
 FENCE = "```"
+# Marcadores de imagen/archivo sin descripción: no aportan texto y ensucian la búsqueda.
+PLACEHOLDER_RE = re.compile(r"(?m)^[ \t]*\[(?:Imagen|Archivo|PDF|Video|Audio)\][ \t]*\n?")
+# Imágenes: ![descripción](img:ID) -> marcador sin espacios que no se parte al trocear
+IMG_MD = re.compile(r"!\[([^\]]*)\]\(img:([0-9a-fA-F-]+)\)")
+IMG_TOKEN = re.compile(r"⟦IMG:([0-9a-f]+)⟧")
 
 
 @dataclass
@@ -138,8 +144,35 @@ def pack(blocks: list[str], size: int, overlap: int) -> list[str]:
     return chunks
 
 
+def protect_images(body: str) -> tuple[str, dict]:
+    captions: dict[str, str] = {}
+
+    def repl(m):
+        image_id = m.group(2).replace("-", "").lower()
+        captions.setdefault(image_id, m.group(1).strip())
+        return f"⟦IMG:{image_id}⟧"
+
+    return IMG_MD.sub(repl, body), captions
+
+
+def restore_images(text: str, captions: dict) -> tuple[str, list[dict]]:
+    """Cambia los marcadores por texto legible y devuelve las imágenes del fragmento."""
+    images: list[dict] = []
+
+    def repl(m):
+        image_id = m.group(1).lower()
+        caption = captions.get(image_id, "")
+        if image_id not in [im["id"] for im in images]:
+            images.append({"id": image_id, "caption": caption})
+        return f"[Imagen: {caption}]" if caption else "[Imagen]"
+
+    return IMG_TOKEN.sub(repl, text), images
+
+
 def chunk_page(md_text: str, size: int = 800, overlap: int = 100) -> list[Chunk]:
     meta, body = parse_front_matter(md_text)
+    body = PLACEHOLDER_RE.sub("", body)
+    body, captions = protect_images(body)
     page_id = meta.get("id", "")
     title = meta.get("title", "")
     path = meta.get("path", title)
@@ -147,6 +180,7 @@ def chunk_page(md_text: str, size: int = 800, overlap: int = 100) -> list[Chunk]
     chunks: list[Chunk] = []
     for section, text in split_sections(body, title):
         for content in pack(split_blocks(text), size, overlap):
+            content, images = restore_images(content, captions)
             context = f"{path} > {section}" if section else path
             i = len(chunks)
             chunks.append(Chunk(
@@ -157,6 +191,7 @@ def chunk_page(md_text: str, size: int = 800, overlap: int = 100) -> list[Chunk]
                 metadata={"page_id": page_id, "title": title, "path": path,
                           "section": section, "url": meta.get("url", ""),
                           "last_edited": meta.get("last_edited", ""),
-                          "chunk_index": i},
+                          "chunk_index": i,
+                          "images": json.dumps(images, ensure_ascii=False)},
             ))
     return chunks

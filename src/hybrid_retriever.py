@@ -5,7 +5,7 @@ import unicodedata
 from dataclasses import replace
 
 from src.indexer import Indexer
-from src.retriever import Hit, Retriever
+from src.retriever import Hit, Retriever, parse_images
 
 STOPWORDS = set("""
 a al algo ante con contra cual cuando de del desde donde e el ella ellos en entre era es esa ese eso esta
@@ -96,7 +96,7 @@ class HybridRetriever:
             if allowed is not None and m["page_id"] not in allowed:
                 continue
             hits.append(Hit(doc, m["title"], m["path"], m["section"], m["url"],
-                            0.0, m["page_id"], cid))
+                            0.0, m["page_id"], cid, images=parse_images(m)))
             if len(hits) >= n:
                 break
         return hits

@@ -1,5 +1,6 @@
 """Búsqueda vectorial de fragmentos relevantes."""
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 
 from src.indexer import Indexer
 
@@ -15,6 +16,14 @@ class Hit:
     page_id: str
     id: str = ""
     similarity: float | None = None   # similitud coseno (solo búsqueda vectorial)
+    images: list = field(default_factory=list)   # [{'id','caption'}] de este fragmento
+
+
+def parse_images(meta: dict) -> list[dict]:
+    try:
+        return json.loads(meta.get("images") or "[]")
+    except (TypeError, ValueError):
+        return []
 
 
 class Retriever:
@@ -45,5 +54,5 @@ class Retriever:
                                         res["metadatas"][0], res["distances"][0]):
             sim = round(1 - dist, 3)
             hits.append(Hit(doc, meta["title"], meta["path"], meta["section"],
-                            meta["url"], sim, meta["page_id"], cid, sim))
+                            meta["url"], sim, meta["page_id"], cid, sim, parse_images(meta)))
         return hits

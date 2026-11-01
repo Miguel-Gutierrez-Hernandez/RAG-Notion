@@ -38,10 +38,12 @@ def rich_text_to_md(rich_text: Optional[list]) -> str:
 class MarkdownRenderer:
     def __init__(self, fetch_children: Callable[[str], list],
                  on_child_page: Optional[Callable] = None,
-                 on_child_database: Optional[Callable] = None):
+                 on_child_database: Optional[Callable] = None,
+                 on_image: Optional[Callable] = None):
         self.fetch_children = fetch_children
         self.on_child_page = on_child_page or (lambda b: None)
         self.on_child_database = on_child_database or (lambda b: None)
+        self.on_image = on_image   # recibe el bloque y devuelve el Markdown que lo representa
 
     def render(self, blocks: list, indent: int = 0) -> str:
         pieces: list[tuple[bool, str]] = []
@@ -121,6 +123,8 @@ class MarkdownRenderer:
             cap = rich_text_to_md(data.get("caption"))
             url = data.get("url", "")
             return self._pad(f"{cap}: {url}" if cap else url, pad)
+        if t == "image" and self.on_image:
+            return self._pad(self.on_image(b), pad)
         if t in MEDIA_LABELS:
             cap = rich_text_to_md(data.get("caption"))
             label = MEDIA_LABELS[t]

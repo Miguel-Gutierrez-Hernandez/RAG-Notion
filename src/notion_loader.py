@@ -1,4 +1,5 @@
 """Cliente de Notion y recorrido recursivo de una página raíz."""
+import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -6,6 +7,7 @@ from typing import Iterator
 
 import requests
 
+from src.images import ImageRef
 from src.notion_markdown import MarkdownRenderer
 
 API = "https://api.notion.com/v1"
@@ -24,6 +26,7 @@ class NotionPage:
     url: str
     last_edited: str
     markdown: str = ""
+    images: list = field(default_factory=list)   # list[ImageRef]
 
     @property
     def path_str(self) -> str:
@@ -105,6 +108,13 @@ class NotionClient:
             cursor = data["next_cursor"]
 
 
+def _plain(rich_text: list | None) -> str:
+    """Texto plano y seguro para usar como descripción dentro de ![...](...)."""
+    text = "".join(t.get("plain_text", "") for t in rich_text or [])
+    text = re.sub(r"[\[\]()\n\r]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _title_of(page_obj: dict) -> str:
     for prop in page_obj.get("properties", {}).values():
         if prop.get("type") == "title":
@@ -127,15 +137,27 @@ def crawl(client: NotionClient, root_id: str) -> Iterator[NotionPage]:
         visited.add(meta.id)
 
         found: list[tuple[str, dict]] = []
+        images: list[ImageRef] = []
+
+        def on_image(block: dict) -> str:
+            data = block.get("image", {})
+            url = (data.get("file") or data.get("external") or {}).get("url", "")
+            if not url:
+                return ""
+            ref = ImageRef(clean_id(block["id"]), url, _plain(data.get("caption")))
+            images.append(ref)
+            return f"![{ref.caption}](img:{ref.id})"
+
         renderer = MarkdownRenderer(
             client.children,
             on_child_page=lambda b: found.append(("page", b)),
             on_child_database=lambda b: found.append(("db", b)),
+            on_image=on_image,
         )
         markdown = renderer.render(client.children(meta.id))
         path = meta.ancestors + [meta.title]
         yield NotionPage(meta.id, meta.title, path, meta.url,
-                         meta.last_edited, markdown)
+                         meta.last_edited, markdown, images)
 
         for kind, block in found:
             if kind == "page":

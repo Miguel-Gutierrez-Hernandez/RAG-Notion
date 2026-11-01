@@ -27,6 +27,7 @@ class Settings:
 
     # Rutas
     raw_dir: Path = BASE_DIR / "data" / "raw"
+    images_dir: Path = BASE_DIR / "data" / "images"
     vectorstore_dir: Path = BASE_DIR / "data" / "vectorstore"
     sync_state_file: Path = BASE_DIR / "data" / "sync_state.json"
 

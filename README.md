@@ -47,6 +47,7 @@ src/
   notion_markdown.py   bloques -> Markdown
   sync_state.py        qué cambió / qué falta indexar
   pipeline.py          sincronizar + indexar (usado por la app)
+  images.py            descarga y selección de imágenes de Notion
   chunker.py           división en fragmentos con contexto
   embeddings.py        embeddings con Ollama
   indexer.py           ChromaDB
@@ -60,10 +61,23 @@ scripts/               utilidades de terminal
 tests/                 pruebas offline:  python3 -m tests.test_qa  (etc.)
 ```
 
+## Imágenes
+
+Al sincronizar, las imágenes de tus páginas se descargan a `data/images/` (las URLs de Notion caducan
+en una hora, por eso se guardan en local). Al responder, la app muestra las imágenes de los fragmentos
+que cita el asistente y, si pides verlas ("muéstrame el mapa de...", "una foto de..."), las de los
+fragmentos más relevantes. Las miniaturas también aparecen en "Ver los N fragmentos recuperados".
+
+- El asistente no "ve" la imagen: encuentra la sección por su texto, su título y la descripción
+  (el pie de foto) que pongas en Notion. Ponles un pie de foto descriptivo y funcionarán mucho mejor.
+- Formatos soportados: PNG, JPG, GIF y WebP (hasta 20 MB). Si una imagen no se puede descargar,
+  la app lo indica y enlaza a la página de Notion.
+- Las imágenes viven solo en tu equipo y están excluidas de git.
+
 ## Tests (no necesitan Notion ni Ollama)
 
 ```bash
-for t in test_markdown test_sync test_chunker test_index test_qa test_pipeline; do python3 -m tests.$t; done
+for t in test_markdown test_sync test_chunker test_index test_qa test_pipeline test_images; do python3 -m tests.$t; done
 ```
 
 ## Problemas frecuentes

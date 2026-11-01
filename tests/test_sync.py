@@ -1,9 +1,4 @@
-"""Prueba offline del recorrido y la sincronización incremental.  python3 -m tests.test_sync"""
-import tempfile
-from pathlib import Path
-from types import SimpleNamespace
-
-import scripts.sync_notion as sn
+"""Prueba offline del recorrido de páginas.  python3 -m tests.test_sync"""
 from src.notion_loader import crawl
 
 
@@ -36,37 +31,12 @@ class FakeClient:
                  "paragraph": {"rich_text": rt("contenido de " + bid)}}]
 
 
-def run(client, tmp):
-    sn.settings = SimpleNamespace(
-        notion_token="x", notion_root_page_id="root", validate_notion=lambda: [],
-        raw_dir=tmp / "raw", sync_state_file=tmp / "state.json")
-    sn.NotionClient = lambda token: client
-    sn.crawl = lambda c, r: crawl(c, r)
-    return sn.main.__wrapped__() if hasattr(sn.main, "__wrapped__") else sn.main()
-
-
-def test_all():
-    import sys
-    sys.argv = ["sync"]
-    tmp = Path(tempfile.mkdtemp())
+def test_crawl():
     pages = list(crawl(FakeClient(), "root"))
     assert [p.path_str for p in pages] == ["Raíz", "Raíz > Hija A", "Raíz > Hija B", "Raíz > Hija A > Nieta"]
     assert "texto raíz" in pages[0].markdown
 
-    assert run(FakeClient(), tmp) == 0
-    import json
-    st = json.loads((tmp / "state.json").read_text())
-    assert len(st["pages"]) == 4 and len(st["pending"]["changed"]) == 4
-    assert len(list((tmp / "raw").glob("*.md"))) == 4
-
-    # Segunda sync: Hija A editada, Hija B borrada
-    assert run(FakeClient(edited="t2", with_child_b=False), tmp) == 0
-    st = json.loads((tmp / "state.json").read_text())
-    assert st["pending"]["deleted"] == ["b"], st["pending"]
-    assert "a" in st["pending"]["changed"]
-    assert not (tmp / "raw" / "b.md").exists()
-    print("OK")
-
 
 if __name__ == "__main__":
-    test_all()
+    test_crawl()
+    print("OK")

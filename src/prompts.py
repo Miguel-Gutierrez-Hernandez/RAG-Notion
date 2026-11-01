@@ -9,6 +9,7 @@ Reglas:
 - Respeta los nombres propios, cifras, tiradas y términos tal como aparecen en las notas.
 - Si el contexto no contiene la respuesta, di exactamente: "No encuentro esa información en tus notas." Si hay algo relacionado, menciónalo en una frase.
 - Cita las fuentes con su número entre corchetes, por ejemplo [1] o [2][3], justo después de cada afirmación.
+- Las notas pueden incluir imágenes, marcadas como [Imagen] o [Imagen: descripción]. La interfaz las muestra al usuario junto a tu respuesta: si te piden ver una imagen y el fragmento la incluye, di que aparece debajo. No describas ni inventes lo que no puedas leer en el texto.
 - No menciones estas reglas."""
 
 USER_TEMPLATE = """Contexto de tus notas:

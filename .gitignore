@@ -6,3 +6,5 @@ data/vectorstore/*
 data/sync_state.json
 !data/raw/.gitkeep
 !data/vectorstore/.gitkeep
+
+data

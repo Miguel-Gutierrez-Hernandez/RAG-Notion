@@ -12,6 +12,7 @@ from src.citations import cited_numbers
 from src.embeddings import EmbeddingError, OllamaEmbedder
 from src.hardware_check import detect_hardware
 from src.hybrid_retriever import HybridRetriever
+from src.images import collect_answer_images, resolve_images
 from src.indexer import Indexer, IndexerError
 from src.llm import LLMError, OllamaChat
 from src.model_selector import select_chat_model
@@ -20,7 +21,7 @@ from src.pipeline import run_index, run_sync
 from src.qa_chain import QAChain
 from src.sync_state import load_state
 
-AVATARS = {"user": "🗡️", "assistant": "🐉"}
+AVATARS = {"user": ":material/person:", "assistant": ":material/auto_stories:"}
 ALL_PAGES = "Todo el grimorio"
 
 STYLE = """
@@ -44,11 +45,11 @@ header[data-testid="stHeader"] { background: transparent; }
 
 /* Cabecera */
 .title { font-family:'Cinzel', Georgia, serif; font-size:2.1rem; font-weight:600;
-         letter-spacing:.18em; text-transform:uppercase; color:var(--gold); margin:0; }
-.tagline { font-style:italic; color:#9c9283; margin:.15rem 0 0 0; font-size:1.05rem; }
+         letter-spacing:.18em; text-transform:uppercase; color:var(--gold) !important; margin:0; }
+.tagline { font-style:italic; color:#d6c9b0 !important; margin:.15rem 0 0 0; font-size:1.05rem; }
 .rule { height:1px; margin:1rem 0 1.4rem 0;
         background:linear-gradient(90deg, var(--gold), rgba(200,161,90,0)); }
-.hint { text-align:center; font-style:italic; color:#7d7467; margin:4rem 0 2rem 0; font-size:1.25rem; }
+.hint { text-align:center; font-style:italic; color:#c9bca3 !important; margin:4rem 0 2rem 0; font-size:1.25rem; }
 
 /* Mensajes: sin burbujas, una línea dorada para el asistente */
 [data-testid="stChatMessage"] { background:transparent; border:none; padding:.6rem 0; }
@@ -67,25 +68,66 @@ header[data-testid="stHeader"] { background: transparent; }
   text-transform:uppercase; color:var(--gold); font-size:1.05rem; margin-bottom:.2rem; }
 
 /* Botones: contorno dorado, sobrios */
-.stButton > button { background:transparent; border:1px solid rgba(200,161,90,.45); color:var(--parchment);
+.stButton button { background:transparent; border:1px solid rgba(200,161,90,.45); color:var(--parchment);
   border-radius:4px; letter-spacing:.06em; transition:all .15s ease; }
-.stButton > button:hover { border-color:var(--gold); color:var(--gold); background:rgba(200,161,90,.06); }
-.stButton > button[kind="primary"] { background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:600; }
-.stButton > button[kind="primary"]:hover { background:#d8b36c; color:var(--ink); }
+.stButton button:hover { border-color:var(--gold); color:var(--gold); background:rgba(200,161,90,.06); }
+.stButton button[kind="primary"] { background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:600; }
+.stButton button[kind="primary"]:hover { background:#d8b36c; color:var(--ink); }
 
 /* Detalles */
 [data-testid="stExpander"] { border:1px solid rgba(200,161,90,.2); border-radius:4px; background:transparent; }
-[data-testid="stExpander"] summary { color:#b9ae9b; }
-[data-testid="stCaptionContainer"] { color:#8a8174; }
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary p { color:#f2e9d6 !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p { color:#d6c9b0 !important; opacity:1 !important; }
+/* Etiquetas de los controles ("Buscar solo en", "Modelo", sliders...) */
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] label, [data-testid="stSidebar"] label p { color:#f2e9d6 !important; }
+/* Streamlit oculta (opacity 0) el mínimo y el máximo de los sliders hasta pasar el ratón */
+[data-testid="stSliderTickBar"] { opacity:1 !important; }
+[data-testid="stSliderTickBar"] p, [data-testid="stSliderTickBar"] div { color:#d6c9b0 !important; opacity:1 !important; }
+[data-testid="stSliderThumbValue"], [data-testid="stSliderThumbValue"] p { color:var(--gold) !important; }
+/* Iconos de ayuda ("?") bien visibles */
+[data-testid="stTooltipIcon"], [data-testid="stTooltipIcon"] svg { color:#e0bd78 !important; opacity:1 !important; }
+[data-testid="stTooltipIcon"] svg, [data-testid="stTooltipIcon"] svg * { stroke:#e0bd78 !important; }
+[data-testid="stTooltipContent"] { border:1px solid rgba(200,161,90,.5); border-radius:4px;
+  background:#17130f !important; color:#f2e9d6 !important; }
+[data-testid="stTooltipContent"] p { color:#f2e9d6 !important; }
+[data-testid="stSlider"] { margin-bottom:.9rem; }
+[data-testid="stChatMessageAvatarUser"] span, [data-testid="stChatMessageAvatarAssistant"] span { color:var(--gold); }
 a { color:var(--gold) !important; text-decoration:none; border-bottom:1px dotted rgba(200,161,90,.5); }
 a:hover { color:#e0bd78 !important; border-bottom-style:solid; }
 hr { border-color:rgba(200,161,90,.15); }
+
+/* ---- Paleta forzada: la app se ve igual sea cual sea el tema que tenga Streamlit ---- */
+.stApp { color-scheme: dark; }
+.stApp, [data-testid="stApp"], [data-testid="stAppViewContainer"], [data-testid="stMain"],
+[data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] {
+  background: var(--ink) !important; color: var(--parchment); }
+[data-testid="stSidebar"], [data-testid="stSidebar"] > div, [data-testid="stSidebarContent"] {
+  background: var(--panel) !important; }
+.stApp [data-testid="stMarkdownContainer"] :is(p, li, strong, em, span, h1, h2, h3, h4, td, th, blockquote) {
+  color: var(--parchment); }
+[data-testid="stExpander"], [data-testid="stExpander"] details { background: transparent !important; }
+/* El texto de los botones hereda el color del propio botón (oscuro sobre el dorado) */
+.stButton button p { color: inherit !important; }
+.stButton button[kind="primary"], .stButton button[kind="primary"]:hover { color: var(--ink) !important; }
+[data-testid="stExpander"] summary { background: var(--panel) !important; }
+[data-testid="stExpander"] summary:hover { background: rgba(200,161,90,.10) !important; }
+[data-testid="stCode"], [data-testid="stCode"] pre, [data-testid="stCode"] code { background: var(--panel) !important; }
+.stApp :not(pre) > code { background: #241d15 !important; color: #e0bd78 !important; }
+[data-testid="stChatInput"], [data-testid="stChatInput"] > div, [data-testid="stChatInput"] textarea {
+  background: var(--panel) !important; color: var(--parchment) !important; }
+[data-testid="stChatInput"] textarea::placeholder { color: #a99e8c !important; opacity: 1; }
+[data-testid="stSelectbox"] [role="group"] { background: var(--ink) !important; border-color: rgba(200,161,90,.3) !important; }
+[data-testid="stSelectbox"] [role="group"] * { color: var(--parchment) !important; }
+[role="listbox"], div:has(> [role="listbox"]) { background: var(--panel) !important; }
+[role="option"] { background: var(--panel) !important; color: var(--parchment) !important; }
+[role="option"][aria-selected="true"], [role="option"]:hover { background: rgba(200,161,90,.16) !important; }
 </style>
 """
 
 # La barra lateral arranca abierta solo si aún no hay nada sincronizado.
 _state = load_state(settings.sync_state_file)
-st.set_page_config(page_title="Grimorio", page_icon="🐉", layout="centered",
+st.set_page_config(page_title="Grimorio", page_icon=":material/auto_stories:", layout="centered",
                    initial_sidebar_state="collapsed" if _state["pages"] else "expanded")
 st.markdown(STYLE, unsafe_allow_html=True)
 
@@ -136,11 +178,26 @@ def hit_label(h) -> str:
     return f"{h.path} > {h.section}" if h.section else h.path
 
 
+def render_images(images: list[dict]) -> None:
+    """Imágenes de las notas que acompañan a la respuesta (en cuadrícula de 3)."""
+    shown = [i for i in images if i.get("path")]
+    if shown:
+        cols = st.columns(min(3, len(shown)))
+        for n, im in enumerate(shown):
+            caption = f"{im['caption']} · {im['label']}" if im.get("caption") else im["label"]
+            with cols[n % len(cols)]:
+                st.image(im["path"], caption=caption)
+    for im in images:
+        if not im.get("path"):
+            st.caption(f"{im.get('caption') or 'Imagen'}: no está descargada. "
+                       f"[Verla en Notion]({im['url']})")
+
+
 def render_sources(hits: list[dict], text: str) -> None:
     if not hits:
         return
     nums = cited_numbers(text, len(hits))
-    st.markdown("**📜 Fuentes citadas**" if nums else "**📜 Fragmentos consultados**")
+    st.markdown("**Fuentes citadas**" if nums else "**Fragmentos consultados**")
     for n in (nums or range(1, len(hits) + 1)):
         h = hits[n - 1]
         link = f"[{clean(h['label'])}]({h['url']})" if h["url"] else clean(h["label"])
@@ -149,6 +206,9 @@ def render_sources(hits: list[dict], text: str) -> None:
         for i, h in enumerate(hits, 1):
             st.markdown(f"**[{i}] {clean(h['label'])}** · relevancia {h['score']}")
             st.markdown(h["content"])
+            for im in h.get("images", []):
+                if im.get("path"):
+                    st.image(im["path"], width=170, caption=im.get("caption") or None)
             if i < len(hits):
                 st.divider()
 
@@ -187,7 +247,7 @@ def do_sync(full: bool = False, rebuild: bool = False) -> None:
 
 # ---------- Barra lateral ----------
 with st.sidebar:
-    st.markdown('<div class="brand">🐉 Grimorio</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand">Grimorio</div>', unsafe_allow_html=True)
     if flash := st.session_state.pop("flash", None):
         st.success(flash)
 
@@ -248,7 +308,7 @@ if indexer.count() == 0:
     st.info("El grimorio está vacío. Abre el panel lateral y pulsa **Actualizar grimorio**.")
     st.stop()
 if page_ids:
-    st.caption(f"🔎 Buscando solo en: {selected}")
+    st.caption(f"Buscando solo en: {selected}")
 
 st.session_state.setdefault("messages", [])
 if not st.session_state.messages:
@@ -256,6 +316,7 @@ if not st.session_state.messages:
 for m in st.session_state.messages:
     with st.chat_message(m["role"], avatar=AVATARS[m["role"]]):
         st.markdown(m["content"])
+        render_images(m.get("images", []))
         render_sources(m.get("hits", []), m["content"])
 
 if prompt := st.chat_input("Pregunta al grimorio…"):
@@ -287,7 +348,11 @@ if prompt := st.chat_input("Pregunta al grimorio…"):
             st.error(str(e))
         else:
             hits = [{"label": hit_label(h), "url": h.url, "score": h.score,
-                     "content": h.content} for h in answer.hits]
+                     "content": h.content,
+                     "images": resolve_images(h.images, settings.images_dir)}
+                    for h in answer.hits]
+            images = collect_answer_images(answer.hits, text, prompt, settings.images_dir)
+            render_images(images)
             render_sources(hits, text)
             st.session_state.messages.append(
-                {"role": "assistant", "content": text, "hits": hits})
+                {"role": "assistant", "content": text, "hits": hits, "images": images})
