@@ -39,14 +39,17 @@ STYLE = """
 .stApp [data-testid="stMarkdownContainer"] li { font-size: 1.12rem; line-height: 1.6; }
 
 /* Limpieza: fuera menús y adornos de Streamlit */
-#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stToolbar"] { display: none !important; }
+#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stMainMenu"], [data-testid="stToolbarActions"] { display: none !important; }
+/* Botón para volver a abrir el menú lateral cuando está cerrado */
+[data-testid="stExpandSidebarButton"], [data-testid="stExpandSidebarButton"] * { color: var(--gold) !important; opacity: 1 !important; }
+[data-testid="stExpandSidebarButton"] { border: 1px solid rgba(200,161,90,.45); border-radius: 4px; background: var(--panel) !important; }
+[data-testid="stExpandSidebarButton"]:hover { border-color: var(--gold); background: rgba(200,161,90,.12) !important; }
 header[data-testid="stHeader"] { background: transparent; }
 .block-container { padding-top: 2.2rem; max-width: 46rem; }
 
 /* Cabecera */
 .title { font-family:'Cinzel', Georgia, serif; font-size:2.1rem; font-weight:600;
          letter-spacing:.18em; text-transform:uppercase; color:var(--gold) !important; margin:0; }
-.tagline { font-style:italic; color:#d6c9b0 !important; margin:.15rem 0 0 0; font-size:1.05rem; }
 .rule { height:1px; margin:1rem 0 1.4rem 0;
         background:linear-gradient(90deg, var(--gold), rgba(200,161,90,0)); }
 .hint { text-align:center; font-style:italic; color:#c9bca3 !important; margin:4rem 0 2rem 0; font-size:1.25rem; }
@@ -301,7 +304,6 @@ with st.sidebar:
 
 # ---------- Chat ----------
 st.markdown('<p class="title">Grimorio</p>'
-            '<p class="tagline">Crónicas, reglas y mazmorras</p>'
             '<div class="rule"></div>', unsafe_allow_html=True)
 
 if indexer.count() == 0:
@@ -356,3 +358,4 @@ if prompt := st.chat_input("Pregunta al grimorio…"):
             render_sources(hits, text)
             st.session_state.messages.append(
                 {"role": "assistant", "content": text, "hits": hits, "images": images})
+            
